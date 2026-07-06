@@ -1,0 +1,39 @@
+[project]
+name = "ocr-quality"
+version = "0.1.0"
+description = "Generic OCR image-material quality gate"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "Pillow",
+  "numpy",
+  "pypdf",
+  "pdfplumber",
+  "python-multipart",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx",
+]
+paddle = [
+  "paddleocr",
+  "paddlepaddle",
+]
+benchmark = [
+  "psutil",
+]
+
+[project.scripts]
+ocr-quality = "ocr_quality.cli:main"
+ocr-quality-web = "ocr_quality.web.server:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"ocr_quality.web" = ["static/*.html"]

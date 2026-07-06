@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OCR 影像质量校验</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, "Microsoft YaHei", sans-serif;
+        background: #f5f7fb;
+        color: #172033;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 28px 20px 48px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        font-weight: 700;
+      }
+      .subtitle {
+        margin: 0 0 22px;
+        color: #607089;
+      }
+      .panel {
+        background: #fff;
+        border: 1px solid #d8e0ed;
+        border-radius: 8px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+      .upload-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      input[type="file"] {
+        min-width: 260px;
+      }
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: #1d4ed8;
+        color: #fff;
+        padding: 9px 16px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #9aa7bd;
+        cursor: not-allowed;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 10px;
+      }
+      .metric {
+        border: 1px solid #d8e0ed;
+        border-radius: 6px;
+        padding: 12px;
+      }
+      .metric span {
+        display: block;
+        color: #607089;
+        font-size: 12px;
+      }
+      .metric strong {
+        display: block;
+        margin-top: 5px;
+        font-size: 20px;
+      }
+      .accepted {
+        color: #087443;
+      }
+      .rejected {
+        color: #b42318;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #e5ebf3;
+        padding: 9px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: #46566f;
+        font-weight: 600;
+        background: #f8fafc;
+      }
+      pre {
+        overflow: auto;
+        background: #101828;
+        color: #d1e7ff;
+        border-radius: 6px;
+        padding: 14px;
+        max-height: 420px;
+      }
+      .hidden {
+        display: none;
+      }
+      .error {
+        color: #b42318;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>OCR 影像质量校验</h1>
+      <p class="subtitle">上传图片或 PDF，查看是否适合进入后续 OCR，并检查原因码、页面级指标和耗时。</p>
+
+      <section class="panel">
+        <div class="upload-row">
+          <input id="fileInput" type="file" accept=".jpg,.jpeg,.png,.bmp,.tif,.tiff,.pdf" />
+          <button id="submitButton">开始质检</button>
+          <span id="statusText"></span>
+        </div>
+      </section>
+
+      <section id="resultPanel" class="panel hidden">
+        <div class="summary">
+          <div class="metric">
+            <span>结论</span>
+            <strong id="acceptedText"></strong>
+          </div>
+          <div class="metric">
+            <span>Decision</span>
+            <strong id="decisionText"></strong>
+          </div>
+          <div class="metric">
+            <span>OCR Readiness</span>
+            <strong id="scoreText"></strong>
+          </div>
+          <div class="metric">
+            <span>耗时</span>
+            <strong id="timeText"></strong>
+          </div>
+          <div class="metric">
+            <span>模型</span>
+            <strong id="modelText"></strong>
+          </div>
+        </div>
+      </section>
+
+      <section id="reasonPanel" class="panel hidden">
+        <h2>原因码</h2>
+        <div id="reasonCodes"></div>
+      </section>
+
+      <section id="pagePanel" class="panel hidden">
+        <h2>页面级结果</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>页码</th>
+              <th>结论</th>
+              <th>分数</th>
+              <th>原因码</th>
+              <th>关键指标</th>
+              <th>文字检测</th>
+            </tr>
+          </thead>
+          <tbody id="pageRows"></tbody>
+        </table>
+      </section>
+
+      <section id="rawPanel" class="panel hidden">
+        <h2>原始 JSON</h2>
+        <pre id="rawJson"></pre>
+      </section>
+    </main>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const submitButton = document.getElementById("submitButton");
+      const statusText = document.getElementById("statusText");
+      const resultPanel = document.getElementById("resultPanel");
+      const reasonPanel = document.getElementById("reasonPanel");
+      const pagePanel = document.getElementById("pagePanel");
+      const rawPanel = document.getElementById("rawPanel");
+
+      submitButton.addEventListener("click", async () => {
+        if (!fileInput.files.length) {
+          statusText.textContent = "请选择文件";
+          statusText.className = "error";
+          return;
+        }
+        submitButton.disabled = true;
+        statusText.textContent = "质检中...";
+        statusText.className = "";
+        const form = new FormData();
+        form.append("file", fileInput.files[0]);
+        try {
+          const response = await fetch("/api/quality/check", {
+            method: "POST",
+            body: form,
+          });
+          const payload = await response.json();
+          renderResult(payload);
+          statusText.textContent = "完成";
+        } catch (error) {
+          statusText.textContent = `请求失败：${error}`;
+          statusText.className = "error";
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
+
+      function renderResult(payload) {
+        resultPanel.classList.remove("hidden");
+        reasonPanel.classList.remove("hidden");
+        pagePanel.classList.remove("hidden");
+        rawPanel.classList.remove("hidden");
+
+        const acceptedText = document.getElementById("acceptedText");
+        acceptedText.textContent = payload.accepted ? "通过" : "拒绝";
+        acceptedText.className = payload.accepted ? "accepted" : "rejected";
+        document.getElementById("decisionText").textContent = payload.decision;
+        document.getElementById("scoreText").textContent = Number(payload.ocrReadinessScore || 0).toFixed(4);
+        document.getElementById("timeText").textContent = `${payload.timingsMs?.total ?? 0} ms`;
+        const modelVersions = payload.modelVersions || {};
+        document.getElementById("modelText").textContent = Object.keys(modelVersions).length
+          ? Object.entries(modelVersions).map(([key, value]) => `${key}:${value}`).join(" / ")
+          : "无";
+        document.getElementById("reasonCodes").textContent = payload.reasonCodes?.length
+          ? payload.reasonCodes.join(", ")
+          : "无";
+        document.getElementById("rawJson").textContent = JSON.stringify(payload, null, 2);
+
+        const rows = document.getElementById("pageRows");
+        rows.innerHTML = "";
+        for (const page of payload.pageResults || payload.pages || []) {
+          const metrics = page.metrics || {};
+          const text = page.textDetectionSummary || {};
+          const occlusion = page.occlusionSummary || {};
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${page.pageIndex + 1}</td>
+            <td>${page.decision}</td>
+            <td>${Number(page.ocrReadinessScore || 0).toFixed(4)}</td>
+            <td>${(page.reasonCodes || []).join(", ") || "无"}</td>
+            <td>sharpness=${metrics.sharpness ?? "-"}<br>std=${metrics.std ?? "-"}<br>edge=${metrics.edgeDensity ?? "-"}</td>
+            <td>boxes=${text.boxCount ?? "-"}<br>coverage=${text.coverageRatio ?? "-"}<br>medianHeight=${text.medianHeight ?? "-"}<br>occlusion=${occlusion.textOverlapRatio ?? "-"}<br>affected=${occlusion.affectedTextBoxRatio ?? "-"}</td>
+          `;
+          rows.appendChild(tr);
+        }
+      }
+    </script>
+  </body>
+</html>
