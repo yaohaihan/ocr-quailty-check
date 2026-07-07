@@ -36,6 +36,8 @@ class OcclusionConfigTests(unittest.TestCase):
         self.assertGreater(config.occlusion_min_affected_box_ratio, 0)
         self.assertGreater(config.occlusion_min_box_overlap_ratio, 0)
         self.assertGreater(config.occlusion_text_box_padding_ratio, 0)
+        self.assertGreater(config.occlusion_max_hand_area_ratio, config.occlusion_min_area_ratio)
+        self.assertLess(config.occlusion_max_hand_rectangularity, 1.0)
 
     def test_occlusion_reason_codes_are_stable(self):
         self.assertEqual(ReasonCode.HAND_OCCLUSION_RISK.value, "HAND_OCCLUSION_RISK")
@@ -70,6 +72,17 @@ class OcclusionAnalyzerTests(unittest.TestCase):
 
         self.assertFalse(result.has_hand_occlusion)
         self.assertFalse(result.has_text_occlusion)
+
+    def test_large_skin_colored_rectangular_background_over_text_is_not_hand_occlusion(self):
+        image = base_page()
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((40, 45, 460, 235), fill=(210, 169, 140))
+        draw.rectangle((100, 90, 300, 120), fill="black")
+        draw.rectangle((100, 150, 320, 180), fill="black")
+
+        result = OcclusionAnalyzer(QualityConfig()).analyze(image, text_result())
+
+        self.assertFalse(result.has_hand_occlusion)
 
     def test_dark_non_text_region_over_text_reports_generic_occlusion(self):
         image = base_page()

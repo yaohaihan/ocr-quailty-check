@@ -55,6 +55,8 @@ class QualityConfig:
     occlusion_min_affected_box_ratio: float = 0.10
     occlusion_min_box_overlap_ratio: float = 0.35
     occlusion_text_box_padding_ratio: float = 0.25
+    occlusion_max_hand_area_ratio: float = 0.20
+    occlusion_max_hand_rectangularity: float = 0.92
     occlusion_skin_min_red: int = 95
     occlusion_skin_min_red_green_delta: int = 12
     occlusion_skin_min_red_blue_delta: int = 20

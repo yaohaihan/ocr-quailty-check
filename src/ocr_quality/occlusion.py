@@ -17,6 +17,8 @@ class OcclusionCandidate:
     y1: int
     area: int
     hand_like: bool
+    area_ratio: float
+    rectangularity: float
 
 
 @dataclass
@@ -196,9 +198,30 @@ class OcclusionAnalyzer:
             y0, y1 = min(ys), max(ys) + 1
             if x1 - x0 < 8 or y1 - y0 < 8:
                 continue
+            area_ratio = len(pixels) / float(page_area)
+            bounding_area = max((x1 - x0) * (y1 - y0), 1)
+            rectangularity = len(pixels) / float(bounding_area)
+            if hand_like and area_ratio > self.config.occlusion_max_hand_area_ratio:
+                continue
+            if hand_like and rectangularity > self.config.occlusion_max_hand_rectangularity:
+                continue
             component_mask = np.zeros_like(mask, dtype=bool)
             component_mask[ys, xs] = True
-            results.append((OcclusionCandidate(x0, y0, x1, y1, len(pixels), hand_like), component_mask))
+            results.append(
+                (
+                    OcclusionCandidate(
+                        x0=x0,
+                        y0=y0,
+                        x1=x1,
+                        y1=y1,
+                        area=len(pixels),
+                        hand_like=hand_like,
+                        area_ratio=area_ratio,
+                        rectangularity=rectangularity,
+                    ),
+                    component_mask,
+                )
+            )
         return results
 
     def _overlap_metrics(

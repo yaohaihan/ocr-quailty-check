@@ -49,6 +49,8 @@
   "occlusion_min_affected_box_ratio": 0.10,
   "occlusion_min_box_overlap_ratio": 0.35,
   "occlusion_text_box_padding_ratio": 0.25,
+  "occlusion_max_hand_area_ratio": 0.20,
+  "occlusion_max_hand_rectangularity": 0.92,
   "occlusion_skin_min_red": 95,
   "occlusion_skin_min_red_green_delta": 12,
   "occlusion_skin_min_red_blue_delta": 20
